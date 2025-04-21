@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Singapore PSI Readings</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      color: #333;
+    }
+
+    header, footer {
+      background-color: #d3d3d3;
+      color: #111;
+      padding: 20px;
+      text-align: center;
+    }
+
+    main {
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 0;
+    }
+
+    h3, h4 {
+      margin: 0.5em 0;
+    }
+
+    a {
+      color: #0073aa;
+      text-decoration: none;
+    }
+
+    .subheader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .subheader > div {
+      margin: 5px 0;
+    }
+
+    button {
+      padding: 6px 12px;
+      background-color: #d3d3d3;
+      color: black;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background-color: #bbb;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #e0e0e0;
+    }
+
+    .description {
+      font-size: 0.8em;
+      color: #666;
+    }
+
+    .status {
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 5px;
+      display: inline-block;
+    }
+
+    .green { background-color: #4caf50; color: white; }
+    .blue { background-color: #2196f3; color: white; }
+    .yellow { background-color: #ffeb3b; color: black; }
+    .orange { background-color: #ff9800; color: white; }
+    .red { background-color: #f44336; color: white; }
+
+    .psi-info {
+      margin-top: 20px;
+      font-size: 0.9em;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .psi-box {
+      font-weight: bold;
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    footer p {
+      margin: 5px 0;
+      font-size: 0.9em;
+    }
+
+    .bold {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Singapore PSI Readings</h1>
+</header>
+
+<main>
+    <div class="subheader">
+        <div>
+          <p>
+            <span class="bold">Source:</span> 
+            <a href="https://data.gov.sg/datasets/d_fe37906a0182569d891506e815e819b7/view" target="_blank">
+              API via data.gov.sg
+            </a> – Data provided by the National Environment Agency, Singapore.
+          </p>
+          <p>
+            <span class="bold">Retrieved:</span> <span id="retrieved-time">...</span>
+          </p>
+        </div>
+        <div>
+          <button onclick="location.reload()">Refresh</button>
+        </div>
+      </div>
+      
+      <p id="status"><span class="bold">Status:</span> <span class="status">...</span></p>      
+
+  <table id="psi-table">
+    <thead></thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="psi-info">
+    <span class="psi-box green">Healthy, 0–50</span>
+    <span class="psi-box blue">Moderate, 51–100</span>
+    <span class="psi-box yellow">Unhealthy, 101–200</span>
+    <span class="psi-box orange">Very Unhealthy, 201–300</span>
+    <span class="psi-box red">Hazardous, above 300</span>
+  </div>
+</main>
+
+<footer>
+  <p>Julian Menko - 1009439</p>
+  <p>MSc Urban Science, Policy and Planning</p>
+  <p>02.526 - Interactive Data Visualisation</p>
+</footer>
+
+<script>
+  const readingsInfo = {
+    "o3_sub_index": "Ozone sub-index",
+    "pm10_twenty_four_hourly": "PM10 (24-hr avg)",
+    "pm10_sub_index": "PM10 sub-index",
+    "co_sub_index": "CO sub-index",
+    "pm25_twenty_four_hourly": "PM2.5 (24-hr avg)",
+    "so2_sub_index": "SO2 sub-index",
+    "co_eight_hour_max": "CO (8-hr max)",
+    "no2_one_hour_max": "NO2 (1-hr max)",
+    "so2_twenty_four_hourly": "SO2 (24-hr avg)",
+    "pm25_sub_index": "PM2.5 sub-index",
+    "psi_twenty_four_hourly": "PSI (24-hr avg)",
+    "o3_eight_hour_max": "Ozone (8-hr max)"
+  };
+
+  const getStatusColorClass = (status) => {
+    status = status.toLowerCase();
+    if (status.includes("good") || status.includes("healthy")) return "green";
+    if (status.includes("moderate")) return "blue";
+    if (status.includes("unhealthy") && !status.includes("very")) return "yellow";
+    if (status.includes("very unhealthy")) return "orange";
+    if (status.includes("hazardous")) return "red";
+    return "";
+  };
+
+  async function fetchPSIData() {
+    const response = await fetch("https://api.data.gov.sg/v1/environment/psi");
+    const data = await response.json();
+    const readings = data.items[0].readings;
+    const regions = Object.keys(readings.psi_twenty_four_hourly);
+    const updateTime = new Date(data.items[0].update_timestamp);
+
+    // Round to nearest hour
+    updateTime.setMinutes(updateTime.getMinutes() >= 30 ? 60 : 0, 0, 0);
+
+    const timestamp = updateTime.toLocaleString("en-SG", {
+      timeZone: "Asia/Singapore",
+      hour12: false
+    });
+
+    // ✅ SET just the time span (non-bold) here
+    document.getElementById("retrieved-time").textContent = `${timestamp} GMT +08.00 Singapore Time`;
+
+    // ✅ Status from api_info.status
+    const statusString = data.api_info.status;
+    const statusColorClass = getStatusColorClass(statusString);
+    const statusSpan = document.querySelector("#status .status");
+    statusSpan.textContent = statusString.charAt(0).toUpperCase() + statusString.slice(1);
+    statusSpan.className = `status ${statusColorClass}`;
+
+    // ✅ Build Table
+    const thead = document.querySelector("#psi-table thead");
+    const tbody = document.querySelector("#psi-table tbody");
+    thead.innerHTML = "";
+    tbody.innerHTML = "";
+
+    const headRow = document.createElement("tr");
+    const emptyTh = document.createElement("th");
+    emptyTh.textContent = "Metric";
+    headRow.appendChild(emptyTh);
+
+    for (let region of regions) {
+      const th = document.createElement("th");
+      th.textContent = region.charAt(0).toUpperCase() + region.slice(1);
+      headRow.appendChild(th);
+    }
+    thead.appendChild(headRow);
+
+    for (let key in readingsInfo) {
+      const row = document.createElement("tr");
+      const labelCell = document.createElement("td");
+      labelCell.innerHTML = `<strong>${key}</strong><br><span class="description">(${readingsInfo[key]})</span>`;
+      row.appendChild(labelCell);
+
+      for (let region of regions) {
+        const td = document.createElement("td");
+        const value = readings[key][region];
+        td.textContent = value !== undefined ? value : "-";
+        row.appendChild(td);
+      }
+
+      tbody.appendChild(row);
+    }
+  }
+
+  fetchPSIData();
+</script>
+
+</body>
+</html>
